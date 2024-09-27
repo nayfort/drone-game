@@ -1,0 +1,23 @@
+.game-setup{
+    display: flex;
+    justify-content: center;
+}
+
+.game-setup__title{
+    text-align: center;
+    margin-top: 70px;
+}
+
+.game-setup__form{
+    margin: 24px auto;
+    .game-setup__form-item{
+        margin-top: 24px;
+        &:last-child{
+            display: flex;
+            justify-content: center;
+            margin-top: 24px;
+        }
+       
+    }
+   
+}
