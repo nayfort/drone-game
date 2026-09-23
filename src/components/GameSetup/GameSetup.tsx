@@ -1,5 +1,5 @@
-import { FC } from 'react';
-import { Form, Button, Input, Select } from 'antd';
+import { FC, useState } from 'react';
+import { Form, Button, Input, Select, Alert } from 'antd';
 import { useNavigate } from 'react-router';
 import { initGame } from '../../services/gameService';
 
@@ -9,13 +9,19 @@ import './GameSetup.scss';
 
 const GameSetup: FC = () => {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
 
   const onFinish = async (values: { name: string; complexity: number }) => {
+    setLoading(true);
+    setError(false);
     try {
-      const playerId = await initGame(values.name, values.complexity);
-      navigate(`/game/${playerId}`);
-    } catch (error) {
-      console.error('Error initializing game:', error);
+      const playerId = await initGame(values.name.trim(), values.complexity);
+      navigate(`/game/${encodeURIComponent(playerId)}`, { state: { complexity: values.complexity } });
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -25,6 +31,7 @@ const GameSetup: FC = () => {
     <div className="game-setup">
       <div className="game-setup__wrap">
         <h2 className="game-setup__title">Drone Game</h2>
+        {error && <Alert type="error" message="Unable to start the game. Please try again." />}
         <Form
           layout="vertical"
           className="game-setup__form"
@@ -38,14 +45,14 @@ const GameSetup: FC = () => {
             name={'name'}
             className="game-setup__form-item"
             label="Player name:"
-            rules={[{ required: true, message: 'Enter your name' }]}
+            rules={[{ required: true, whitespace: true, message: 'Enter your name' }]}
           >
             <Input placeholder="Enter your name" />
           </Form.Item>
           <Form.Item
             label="Difficulty level:"
             className="game-setup__form-item"
-            name="difficulty"
+            name="complexity"
             rules={[
               { required: true, message: 'Choose the level of difficulty' },
               { type: 'number', min: 0, max: 10 },
@@ -60,7 +67,7 @@ const GameSetup: FC = () => {
             </Select>
           </Form.Item>
           <Form.Item className="game-setup__form-item">
-            <Button htmlType="submit">Start</Button>
+            <Button htmlType="submit" loading={loading}>Start</Button>
           </Form.Item>
         </Form>
       </div>

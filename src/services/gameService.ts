@@ -1,70 +1,59 @@
-import axios from "axios";
+import axios from 'axios';
+import { CaveData } from '../utils/game';
 
-// const URL = 'https://cave-drone-server.shtoa.xyz';
-const URL = 'https://cave-drone-client.shtoa.xyz';
+const baseURL = import.meta.env.VITE_API_URL || 'https://cave-drone-server.shtoa.xyz';
+const api = axios.create({ baseURL, timeout: 15000 });
 
-export const initGame = async (name: string, complexity: number): Promise<string> => {
-    try {
-        const response = await axios.post(`${URL}/init`, { name, complexity });
-        return response.data.id;
-    } catch (error) {
-        console.error('Error game init:', error);
-        throw error;
-    }
+export async function initGame(name: string, complexity: number): Promise<string> {
+  const { data } = await api.post('/init', { name, complexity });
+  if (typeof data.id !== 'string' || !data.id) throw new Error('Invalid player ID');
+  return data.id;
 }
 
-export const getPlayerToken = async (playerId: string): Promise<string> => {
-    try {
-        const tokenChunks = await Promise.all([
-            axios.get(`${URL}/token/1?id=${playerId}`),
-            axios.get(`${URL}/token/2?id=${playerId}`),
-            axios.get(`${URL}/token/3?id=${playerId}`),
-            axios.get(`${URL}/token/4?id=${playerId}`),
-        ]);
+export async function getPlayerToken(playerId: string, signal?: AbortSignal): Promise<string> {
+  const responses = await Promise.all([1, 2, 3, 4].map(part =>
+    api.get(`/token/${part}`, { params: { id: playerId }, signal })
+  ));
+  if (responses.some(({ data }) => typeof data.chunk !== 'string')) throw new Error('Invalid token');
+  return responses.map(({ data }) => data.chunk).join('');
+}
 
-        const token = tokenChunks
-            .map((response) => response.data.chunk)
-            .join('');
-
-        return token;
-    } catch (error) {
-        console.error('Error receiving a token:', error);
-        throw error;
-    }
-};
-
-export const getCaveData = async (
-    playerId: string,
-    playerToken: string
-): Promise<[number, number][]> => {
-    try {
-        const socket = new WebSocket(`wss://cave-drone-server.shtoa.xyz/cave`);
-
-        socket.onopen = () => {
-            socket.send(`player:${playerId}-${playerToken}`);
-        };
-
-        const caveData: [number, number][] = [];
-
-        socket.onmessage = (event) => {
-            if (event.data === 'finished') {
-                socket.close();
-            } else {
-                const [left, right] = event.data.split(',').map(Number);
-                caveData.push([left, right]);
-            }
-        };
-
-        await new Promise((resolve) => {
-            socket.onclose = resolve;
-        });
-
-        return caveData;
-    } catch (error) {
-        console.error('Error when retrieving cave data:', error);
-        throw error;
-    }
-};
-
-
-
+export function getCaveData(playerId: string, playerToken: string, signal?: AbortSignal): Promise<CaveData> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(new Error('Request cancelled')); return; }
+    const url = new URL(baseURL);
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    url.pathname = `${url.pathname.replace(/\/$/, '')}/cave`;
+    const socket = new WebSocket(url);
+    const cave: CaveData = [];
+    let settled = false;
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
+      socket.close();
+      if (error) reject(error);
+      else resolve(cave);
+    };
+    const abort = () => finish(new Error('Request cancelled'));
+    const timer = setTimeout(() => finish(new Error('Cave request timed out')), 30000);
+    signal?.addEventListener('abort', abort, { once: true });
+    socket.onopen = () => socket.send(`player:${playerId}-${playerToken}`);
+    socket.onmessage = ({ data }) => {
+      if (data === 'finished') {
+        finish(cave.length ? undefined : new Error('Empty cave'));
+        return;
+      }
+      const parts = typeof data === 'string' ? data.split(',') : [];
+      const values = parts.map(Number);
+      if (parts.length !== 2 || parts.some(part => !part.trim()) || !values.every(Number.isFinite) || values[0] >= values[1]) {
+        finish(new Error('Invalid cave data'));
+        return;
+      }
+      cave.push([values[0], values[1]]);
+    };
+    socket.onerror = () => finish(new Error('Cave connection failed'));
+    socket.onclose = () => finish(new Error('Cave connection closed before completion'));
+  });
+}

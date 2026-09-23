@@ -7,27 +7,34 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run tests/game.test.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "antd": "^5.15.3",
     "axios": "^1.6.8",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router": "^6.22.3",
-    "react-router-dom": "^6.22.3",
+    "react-router": "^7.18.4",
+    "react-router-dom": "^7.18.4",
     "sass": "^1.72.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/react": "^18.2.64",
     "@types/react-dom": "^18.2.21",
     "@typescript-eslint/eslint-plugin": "^7.1.1",
     "@typescript-eslint/parser": "^7.1.1",
-    "@vitejs/plugin-react": "^4.2.1",
+    "@vitejs/plugin-react": "^6.1.1",
     "eslint": "^8.57.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
     "typescript": "^5.2.2",
-    "vite": "^5.1.6"
+    "vite": "^8.3.0",
+    "vitest": "^5.0.1"
+  },
+  "engines": {
+    "node": "^22.12.0 || >=24.0.0"
   }
 }
